@@ -4,7 +4,21 @@ go:
   - 1.6
   - 1.7
   - 1.8
-  - tip
+  - 1.11
+
+# Travis now installs Go via golang.org/dl, which has no go1.6-go1.8 packages;
+# fetch the official toolchain tarball for the leg's version instead.
+before_install:
+  - mkdir -p "$HOME/goroot-$TRAVIS_GO_VERSION"
+  - curl -fsSL "https://dl.google.com/go/go${TRAVIS_GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C "$HOME/goroot-$TRAVIS_GO_VERSION" --strip-components=1
+  - export GOROOT="$HOME/goroot-$TRAVIS_GO_VERSION"
+  - export PATH="$GOROOT/bin:$PATH"
+  - go version
+
+# The checkout sits outside GOPATH and the package has no non-stdlib deps;
+# pre-modules `go get` cannot install a package outside GOPATH, so just build.
+install:
+  - go build -v ./...
 
 script:
   - go test -v

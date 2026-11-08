@@ -1,0 +1,35 @@
+name: seal-build
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Pack module zip
+        run: |
+          set -euo pipefail
+          # Copy the tree without VCS metadata and without this workflow file
+          # (it is not part of the published module; upstream ships no .github).
+          mkdir -p "$RUNNER_TEMP/mod"
+          rsync -a --exclude .git src/ "$RUNNER_TEMP/mod/"
+          rm -rf "$RUNNER_TEMP/mod/.github"
+          mkdir -p "$RUNNER_TEMP/packer" dist
+          cd "$RUNNER_TEMP/packer"
+          go mod init packer
+          go get golang.org/x/mod@v0.17.0
+          printf '%s\n' 'package main' 'import ("log"; "os"; "golang.org/x/mod/module"; "golang.org/x/mod/zip")' 'func main() { f, err := os.Create(os.Args[2]); if err != nil { log.Fatal(err) }; defer f.Close(); mv := module.Version{Path: "github.com/Masterminds/goutils", Version: "v1.1.0"}; if err := zip.CreateFromDir(f, mv, os.Args[1]); err != nil { log.Fatal(err) } }' > main.go
+          go run . "$RUNNER_TEMP/mod" "$GITHUB_WORKSPACE/dist/v1.1.0.zip"
+          unzip -l "$GITHUB_WORKSPACE/dist/v1.1.0.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: go-module-zip
+          path: dist/v1.1.0.zip
